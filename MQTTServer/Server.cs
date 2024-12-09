@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Reflection;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Common;
@@ -14,36 +16,43 @@ public class Server
 {
     private readonly ServerInfo _serverInfo;
     private readonly MqttServerFactory _factory = new();
-    private readonly X509Certificate2 _certificate;
-    private readonly ConcurrentQueue<InterceptingPublishEventArgs> _publishQueue = new();
+    private readonly X509Certificate _certificate;
+    public readonly ConcurrentQueue<InterceptingPublishEventArgs> RecvQueue = new();
     private MqttServer _server;
 
     public Server(ServerInfo serverInfo)
     {
         _serverInfo = serverInfo;
-        _certificate = X509Certificate2.CreateFromPem(_serverInfo.CertificatePath);
     }
 
     public async Task Run()
     {
-        var options = new MqttServerOptionsBuilder()
-            .WithEncryptionCertificate(_certificate)
-            .WithEncryptedEndpoint()
-            .Build();
-        _server = _factory.CreateMqttServer(options);
-        _server.ValidatingConnectionAsync += ServerOnValidatingConnectionAsync;
-        _server.ClientConnectedAsync += ServerOnClientConnectedAsync;
-        _server.ClientDisconnectedAsync += ServerOnClientDisconnectedAsync;
-        _server.ClientSubscribedTopicAsync += ServerOnClientSubscribedTopicAsync;
-        _server.InterceptingPublishAsync += ServerOnInterceptingPublishAsync;
-        await _server.StartAsync();
-        
-        
+        try
+        {
+            var path = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), _serverInfo.CertificatePath);
+            var options = new MqttServerOptionsBuilder()
+                .WithEncryptionCertificate(File.ReadAllBytes(path), new MqttServerCertificateCredentials() { Password = "IDoNotKnow!" })
+                .WithDefaultEndpoint()
+                .WithDefaultEndpointPort(_serverInfo.Port)
+                .Build();
+            _server = _factory.CreateMqttServer(options);
+            _server.ValidatingConnectionAsync += ServerOnValidatingConnectionAsync;
+            _server.ClientConnectedAsync += ServerOnClientConnectedAsync;
+            _server.ClientDisconnectedAsync += ServerOnClientDisconnectedAsync;
+            _server.ClientSubscribedTopicAsync += ServerOnClientSubscribedTopicAsync;
+            _server.InterceptingPublishAsync += ServerOnInterceptingPublishAsync;
+            await _server.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+        }
     }
 
     private Task ServerOnInterceptingPublishAsync(InterceptingPublishEventArgs arg)
     {
-        _publishQueue.Enqueue(arg);
+        RecvQueue.Enqueue(arg);
+        Log.Information($"{arg.ClientId} Recv <---");
         return Task.CompletedTask;
     }
 
@@ -61,6 +70,8 @@ public class Server
             {
                 SenderClientId = clientId
             });
+
+        Log.Information($"{clientId} Send --->");
     }
 
     private Task ServerOnValidatingConnectionAsync(ValidatingConnectionEventArgs arg)
@@ -68,6 +79,12 @@ public class Server
         arg.ReasonCode = arg.UserName == _serverInfo.UserName && arg.Password == _serverInfo.Password
             ? MqttConnectReasonCode.Success
             : MqttConnectReasonCode.UnspecifiedError;
+
+        if (arg.ReasonCode == MqttConnectReasonCode.Success)
+        {
+            _server.SubscribeAsync(arg.ClientId, $"/estation/{arg.ClientId}/send");
+        }
+
         return Task.CompletedTask;
     }
 
@@ -98,8 +115,8 @@ public class Server
 
 public class ServerInfo
 {
-    public int Port { get; set; } = 9071;
+    public int Port { get; set; } = 9090;
     public string UserName { get; set; } = "test";
     public string Password { get; set; } = "Pass99";
-    public string CertificatePath { get; set; } = "server.pem";
+    public string CertificatePath { get; set; } = "server.crt";
 }

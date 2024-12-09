@@ -1,12 +1,2 @@
 
-.DS_Store
-/.idea
-/Common/bin
-/Common/obj
-/MQTTClient/bin
-/MQTTClient/obj
-/MQTTServer/obj
-/Test/bin
-/Test/obj
-/WSClient/obj
-/WSServer/obj
+/.vs
