@@ -1,11 +1,9 @@
-using System.Text.Json.Serialization;
-
 namespace Common;
 
 public class TaskData : Message
 {
-    public TaskData(MessageCode code, int token, object body)
-        : base(code, token, body)
+    public TaskData(MessageCode code, int token)
+        : base(code, token)
     {
     }
 

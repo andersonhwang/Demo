@@ -37,19 +37,21 @@ namespace MQTTServer
 
                     while (server.RecvQueue.TryDequeue(out var data))
                     {
-                        var message = JsonSerializer.Deserialize<Message>(Encoding.UTF8.GetString(data.ApplicationMessage.Payload));
+                        var str = Encoding.UTF8.GetString(data.ApplicationMessage.Payload);
+                        var message = JsonSerializer.Deserialize<Message>(str);
                         if (message == null) continue;
                         switch (message.Code)
                         {
                             case MessageCode.Data:
-                                var task = message.Body as TaskData;
+                                var task = JsonSerializer.Deserialize<TaskData>(str);
                                 if (task is null) continue;
-                                await server.SendMessage(data.ClientId, new Message(MessageCode.Result, message.Token, new TaskResult
+                                var result = new TaskResult(MessageCode.Result, message.Token)
                                 {
                                     Date = DateTime.Now,
                                     TaskId = task.TaskId,
                                     Data = task.Data.Reverse().ToArray()
-                                }));
+                                };
+                                await server.SendMessage(data.ClientId, result);
                                 break;
                         }
                     }

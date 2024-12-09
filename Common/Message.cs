@@ -16,21 +16,14 @@ public class Message
     public int Token { get; }
 
     /// <summary>
-    /// Message body
-    /// </summary>
-    public object Body { get; }
-
-    /// <summary>
     /// Constructor
     /// </summary>
     /// <param name="code">Message code</param>
     /// <param name="token">Message token</param>
-    /// <param name="body">Message body</param>
-    public Message(MessageCode code, int token, object body)
+    public Message(MessageCode code, int token)
     {
         Code = code;
         Token = token;
-        Body = body;
     }
 }
 

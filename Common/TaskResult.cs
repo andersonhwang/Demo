@@ -2,8 +2,8 @@ namespace Common;
 
 public class TaskResult : Message
 {
-    public TaskResult(MessageCode code, int token, object body) 
-        : base(code, token, body)
+    public TaskResult(MessageCode code, int token) 
+        : base(code, token)
     {
     }
 
