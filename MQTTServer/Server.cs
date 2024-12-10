@@ -1,14 +1,12 @@
-using System.Collections.Concurrent;
-using System.Reflection;
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
-using System.Text.Json;
 using Common;
 using MQTTnet;
-using MQTTnet.Diagnostics.Logger;
 using MQTTnet.Protocol;
 using MQTTnet.Server;
 using Serilog;
+using System.Collections.Concurrent;
+using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 
 namespace MQTTServer;
 
@@ -17,7 +15,9 @@ public class Server
     private readonly ServerInfo _serverInfo;
     private readonly MqttServerFactory _factory = new();
     private readonly X509Certificate _certificate;
-    public readonly ConcurrentQueue<InterceptingPublishEventArgs> RecvQueue = new();
+    public readonly ConcurrentQueue<(string, MqttApplicationMessage)> RecvQueue = new();
+    private object _locker = new object();
+    public HashSet<string> Clients = new HashSet<string>();
     private MqttServer _server;
 
     public Server(ServerInfo serverInfo)
@@ -51,8 +51,7 @@ public class Server
 
     private Task ServerOnInterceptingPublishAsync(InterceptingPublishEventArgs arg)
     {
-        RecvQueue.Enqueue(arg);
-        Log.Information($"{arg.ClientId} Recv <---");
+        RecvQueue.Enqueue((arg.ClientId, arg.ApplicationMessage));
         return Task.CompletedTask;
     }
 
@@ -60,7 +59,7 @@ public class Server
     {
         // Create a new message using the builder as usual.
         var mqtt = new MqttApplicationMessageBuilder()
-            .WithTopic($"/estation/{clientId}/recv")
+            .WithTopic("/estation/recv")
             .WithPayload(JsonSerializer.Serialize(message))
             .Build();
 
@@ -70,8 +69,6 @@ public class Server
             {
                 SenderClientId = clientId
             });
-
-        Log.Information($"{clientId} Send --->");
     }
 
     private Task ServerOnValidatingConnectionAsync(ValidatingConnectionEventArgs arg)
@@ -82,7 +79,8 @@ public class Server
 
         if (arg.ReasonCode == MqttConnectReasonCode.Success)
         {
-            _server.SubscribeAsync(arg.ClientId, $"/estation/{arg.ClientId}/send");
+            _server.SubscribeAsync(arg.ClientId, "/estation/send");
+            Clients.Add(arg.ClientId);
         }
 
         return Task.CompletedTask;
@@ -90,19 +88,20 @@ public class Server
 
     private Task ServerOnClientSubscribedTopicAsync(ClientSubscribedTopicEventArgs arg)
     {
-        Log.Information($"Client {arg.ClientId} Subscribed {arg.TopicFilter.Topic}");
+        //Log.Information($"Client {arg.ClientId} Subscribed {arg.TopicFilter.Topic}");
         return Task.CompletedTask;
     }
 
     private Task ServerOnClientDisconnectedAsync(ClientDisconnectedEventArgs arg)
     {
-        Log.Information($"Client {arg.ClientId}({arg.Endpoint}) disconnected.");
+        //Log.Information($"Client {arg.ClientId}({arg.Endpoint}) disconnected.");
+        Clients.Remove(arg.ClientId);
         return Task.CompletedTask;
     }
 
     private Task ServerOnClientConnectedAsync(ClientConnectedEventArgs arg)
     {
-        Log.Information($"Client {arg.ClientId}({arg.Endpoint}) connected.");
+        //Log.Information($"Client {arg.ClientId}({arg.Endpoint}) connected.");
         return Task.CompletedTask;
     }
 
@@ -110,6 +109,23 @@ public class Server
     {
         if (_server.IsStarted)
             await _server.StopAsync();
+    }
+
+    private void AddClient(string clientId)
+    {
+        lock (_locker)
+        {
+            if (Clients.Contains(clientId)) return;
+            Clients.Add(clientId);
+        }
+    }
+
+    private void RemoveClient(string clientId)
+    {
+        lock (_locker)
+        {
+            Clients.Remove(clientId);
+        }
     }
 }
 

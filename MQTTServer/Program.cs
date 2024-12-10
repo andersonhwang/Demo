@@ -22,6 +22,8 @@ namespace MQTTServer
                 .CreateLogger();
 
             var server = new Server(new ServerInfo());
+            long RecvCount = 0;
+            long SendCount = 0;
 
             Task.Run(server.Run);
 
@@ -29,17 +31,19 @@ namespace MQTTServer
             {
                 while (true)
                 {
-                    if (server.RecvQueue.Count == 0)
+                    if (server.RecvQueue.IsEmpty)
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(1));
+                        await Task.Delay(TimeSpan.FromSeconds(0.1));
                         continue;
                     }
 
                     while (server.RecvQueue.TryDequeue(out var data))
                     {
-                        var str = Encoding.UTF8.GetString(data.ApplicationMessage.Payload);
+                        if (data.Item2.Topic != "/estation/send") continue;
+                        var str = Encoding.UTF8.GetString(data.Item2.Payload);
                         var message = JsonSerializer.Deserialize<Message>(str);
                         if (message == null) continue;
+                        Interlocked.Increment(ref RecvCount);
                         switch (message.Code)
                         {
                             case MessageCode.Data:
@@ -51,10 +55,20 @@ namespace MQTTServer
                                     TaskId = task.TaskId,
                                     Data = task.Data.Reverse().ToArray()
                                 };
-                                await server.SendMessage(data.ClientId, result);
+                                await server.SendMessage(data.Item1, result);
+                                Interlocked.Increment(ref SendCount);
                                 break;
                         }
                     }
+                }
+            });
+
+            Task.Run(async () =>
+            {
+                while(true)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    Console.WriteLine($"Online:{server.Clients.Count}, Recv:{RecvCount}, Send:{SendCount}.");
                 }
             });
             

@@ -1,2 +1,16 @@
 
 /.vs
+/Common/obj
+/MQTTClient/obj
+/MQTTServer/bin
+/MQTTServer/obj
+/MQTTServer/obj
+/Test/obj
+/WSClient/obj
+/MQTTServer/bin
+/Common/obj
+/MQTTServer/obj
+/WSServer/obj
+/MQTTServer/bin/Debug
+/Common/bin
+/Common/bin
