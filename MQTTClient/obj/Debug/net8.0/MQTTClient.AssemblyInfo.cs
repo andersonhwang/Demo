@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MQTTClient")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5646261f289dcfbb9704f0ed9a332cd14dd2c85b")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+273f36f09afc1462d151c296be785fc110017559")]
 [assembly: System.Reflection.AssemblyProductAttribute("MQTTClient")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MQTTClient")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

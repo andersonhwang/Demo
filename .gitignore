@@ -1,16 +1,58 @@
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
 
-/.vs
-/Common/obj
-/MQTTClient/obj
-/MQTTServer/bin
-/MQTTServer/obj
-/MQTTServer/obj
-/Test/obj
-/WSClient/obj
-/MQTTServer/bin
-/Common/obj
-/MQTTServer/obj
-/WSServer/obj
-/MQTTServer/bin/Debug
-/Common/bin
-/Common/bin
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# Visual Studio files
+vs/
+vscode/
+*.vc.db
+*.VC.opendb
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+TestResult.xml
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+**/Properties/launchSettings.json
+
+# NuGet packages
+*.nupkg
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+# Azure
+csx/
+*.build.csdef
+ecf/
+rcf/
+PublishScripts/
+
+# Others
+node_modules/
+typings/
+*.dbmdl
+*.dbproj.schemaview
+*.jfm
+*.pfx
+*.publishsettings
+orleans.codegen.cs

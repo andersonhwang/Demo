@@ -5,6 +5,7 @@ using MQTTnet.Server;
 using Serilog;
 using System.Collections.Concurrent;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 
@@ -16,8 +17,8 @@ public class Server
     private readonly MqttServerFactory _factory = new();
     private readonly X509Certificate _certificate;
     public readonly ConcurrentQueue<(string, MqttApplicationMessage)> RecvQueue = new();
-    private object _locker = new object();
-    public HashSet<string> Clients = new HashSet<string>();
+    public readonly ConcurrentQueue<(bool, string)> ClientsQueue = new();
+    public HashSet<string> Clients = new();
     private MqttServer _server;
 
     public Server(ServerInfo serverInfo)
@@ -37,11 +38,27 @@ public class Server
                 .Build();
             _server = _factory.CreateMqttServer(options);
             _server.ValidatingConnectionAsync += ServerOnValidatingConnectionAsync;
-            _server.ClientConnectedAsync += ServerOnClientConnectedAsync;
             _server.ClientDisconnectedAsync += ServerOnClientDisconnectedAsync;
-            _server.ClientSubscribedTopicAsync += ServerOnClientSubscribedTopicAsync;
             _server.InterceptingPublishAsync += ServerOnInterceptingPublishAsync;
             await _server.StartAsync();
+
+            while (true)
+            {
+                while (ClientsQueue.TryDequeue(out var client))
+                {
+                    if (client.Item1)
+                    {
+                        if (Clients.Contains(client.Item2)) continue;
+                        Clients.Add(client.Item2);
+                    }
+                    else
+                    {
+                        Clients.Remove(client.Item2);
+                    }
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
         }
         catch (Exception ex)
         {
@@ -60,6 +77,7 @@ public class Server
         // Create a new message using the builder as usual.
         var mqtt = new MqttApplicationMessageBuilder()
             .WithTopic("/estation/recv")
+            .WithTopicAlias(ushort.Parse(clientId))
             .WithPayload(JsonSerializer.Serialize(message))
             .Build();
 
@@ -80,28 +98,16 @@ public class Server
         if (arg.ReasonCode == MqttConnectReasonCode.Success)
         {
             _server.SubscribeAsync(arg.ClientId, "/estation/send");
-            Clients.Add(arg.ClientId);
+            ClientsQueue.Enqueue((true, arg.ClientId));
         }
 
-        return Task.CompletedTask;
-    }
-
-    private Task ServerOnClientSubscribedTopicAsync(ClientSubscribedTopicEventArgs arg)
-    {
-        //Log.Information($"Client {arg.ClientId} Subscribed {arg.TopicFilter.Topic}");
         return Task.CompletedTask;
     }
 
     private Task ServerOnClientDisconnectedAsync(ClientDisconnectedEventArgs arg)
     {
         //Log.Information($"Client {arg.ClientId}({arg.Endpoint}) disconnected.");
-        Clients.Remove(arg.ClientId);
-        return Task.CompletedTask;
-    }
-
-    private Task ServerOnClientConnectedAsync(ClientConnectedEventArgs arg)
-    {
-        //Log.Information($"Client {arg.ClientId}({arg.Endpoint}) connected.");
+        ClientsQueue.Enqueue((false, arg.ClientId));
         return Task.CompletedTask;
     }
 
@@ -110,28 +116,11 @@ public class Server
         if (_server.IsStarted)
             await _server.StopAsync();
     }
-
-    private void AddClient(string clientId)
-    {
-        lock (_locker)
-        {
-            if (Clients.Contains(clientId)) return;
-            Clients.Add(clientId);
-        }
-    }
-
-    private void RemoveClient(string clientId)
-    {
-        lock (_locker)
-        {
-            Clients.Remove(clientId);
-        }
-    }
 }
 
 public class ServerInfo
 {
-    public int Port { get; set; } = 9090;
+    public int Port { get; set; } = 9071;
     public string UserName { get; set; } = "test";
     public string Password { get; set; } = "Pass99";
     public string CertificatePath { get; set; } = "server.crt";

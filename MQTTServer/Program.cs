@@ -20,8 +20,17 @@ namespace MQTTServer
                 .WriteTo.Console(
                 outputTemplate: "{Timestamp:HH:mm:ss.fff}[{Level:u1}]{Message} {NewLine}{Exception}")
                 .CreateLogger();
+        PORT:
+            Console.Write("Sever Port:");
+            var input = Console.ReadLine();
 
-            var server = new Server(new ServerInfo());
+            if (!int.TryParse(input, out var port) || port < 1000 || port > 65535)
+            {
+                Console.WriteLine("Invalid Port:" + input);
+                goto PORT;
+            }
+
+            var server = new Server(new ServerInfo() { Port = port });
             long RecvCount = 0;
             long SendCount = 0;
 
@@ -65,13 +74,13 @@ namespace MQTTServer
 
             Task.Run(async () =>
             {
-                while(true)
+                while (true)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(2));
-                    Console.WriteLine($"Online:{server.Clients.Count}, Recv:{RecvCount}, Send:{SendCount}.");
+                    Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]Online:{server.Clients.Count}, Recv:{RecvCount}, Send:{SendCount}.");
                 }
             });
-            
+
             Console.WriteLine("Press any key to exit");
             Console.ReadLine();
         }
